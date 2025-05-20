@@ -18,13 +18,33 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '8'
-          cache: 'maven'  # 使用官方推荐的 Maven 依赖缓存
+          cache: 'maven'
 
       - name: Build and execute
         env:
           BDUSS: ${{ secrets.BDUSS }}
           SCKEY: ${{ secrets.SCKEY }}
+          SERVERCHAN_KEY: ${{ secrets.ONE }}  # 新增 Server 酱的 SendKey
         run: |
-          mvn -B compile exec:java \
+          # 运行签到脚本并捕获输出日志
+          mvn_output=$(mvn -B compile exec:java \
             -Dexec.mainClass="top.srcrs.Run" \
-            -Dexec.args="$BDUSS $SCKEY"
+            -Dexec.args="$BDUSS $SCKEY" 2>&1)
+
+          # 获取命令执行状态码
+          status_code=$?
+
+          # 根据状态码构造推送消息
+          if [ $status_code -eq 0 ]; then
+            title="✅ 贴吧签到成功"
+            desp="时间: $(date +"%Y-%m-%d %H:%M:%S")\n仓库: ${{ github.repository }}\n状态: 成功\n日志摘要:\n\`\`\`\n$(echo "$mvn_output" | tail -n 6)\`\`\`"
+          else
+            title="❌ 贴吧签到失败"
+            desp="时间: $(date +"%Y-%m-%d %H:%M:%S")\n仓库: ${{ github.repository }}\n状态: 失败\n错误日志:\n\`\`\`\n$(echo "$mvn_output" | tail -n 10)\`\`\`"
+          fi
+
+          # 调用 Server 酱 API 推送
+          curl -X POST \
+            -d "title=$title" \
+            --data-urlencode "desp=$desp" \
+            "https://sctapi.ftqq.com/$SERVERCHAN_KEY.send"
