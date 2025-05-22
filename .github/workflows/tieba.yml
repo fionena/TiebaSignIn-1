@@ -36,10 +36,10 @@ jobs:
 
           # 根据状态码构造推送消息
           if [ $status_code -eq 0 ]; then
-            title="クライン-✅ 贴吧签到成功"
+            title="安和昂-✅贴吧签到成功"
             desp="时间: $(date +"%Y-%m-%d %H:%M:%S")\n仓库: ${{ github.repository }}\n状态: 成功\n日志摘要:\n\`\`\`\n$(echo "$mvn_output" | tail -n 6)\`\`\`"
           else
-            title="クライン-❌ 贴吧签到失败"
+            title="安和昂-❌贴吧签到失败"
             desp="时间: $(date +"%Y-%m-%d %H:%M:%S")\n仓库: ${{ github.repository }}\n状态: 失败\n错误日志:\n\`\`\`\n$(echo "$mvn_output" | tail -n 10)\`\`\`"
           fi
 
