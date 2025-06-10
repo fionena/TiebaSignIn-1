@@ -20,57 +20,30 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
-      - name: Build and execute for multiple accounts
+      - name: Build and execute
         env:
-          # 多个账号的BDUSS，用空格分隔
           BDUSS: ${{ secrets.BDUSS }}
-          # Server酱的SendKey（用于汇总通知）
-          SERVERCHAN_KEY: ${{ secrets.ONE  }}
+          SCKEY: ${{ secrets.SCKEY }}
+          SERVERCHAN_KEY: ${{ secrets.ONE }}  # 新增 Server 酱的 SendKey
         run: |
-          # 将BDUSS转换为数组
-          IFS=' ' read -r -a bduss_array <<< "$BDUSS"
-          
-          # 初始化结果汇总
-          summary=""
-          success_count=0
-          failure_count=0
-          account_count=${#bduss_array[@]}
-          
-          # 循环处理每个账号
-          for i in "${!bduss_array[@]}"; do
-            echo "正在处理账号 $((i+1))/$account_count ..."
-            BDUSS=${bduss_array[$i]}
-            
-            # 执行签到并捕获输出
-            mvn_output=$(mvn -B compile exec:java \
-              -Dexec.mainClass="top.srcrs.Run" \
-              -Dexec.args="$BDUSS" 2>&1)  # 移除了SCKEY参数
-            
-            # 检查执行状态
-            status_code=$?
-            
-            # 记录结果
-            if [ $status_code -eq 0 ]; then
-              summary+="✅ 账号 $((i+1)): 签到成功\n"
-              success_count=$((success_count+1))
-            else
-              summary+="❌ 账号 $((i+1)): 签到失败\n"
-              failure_count=$((failure_count+1))
-            fi
-          done
+          # 运行签到脚本并捕获输出日志
+          mvn_output=$(mvn -B compile exec:java \
+            -Dexec.mainClass="top.srcrs.Run" \
+            -Dexec.args="$BDUSS $SCKEY" 2>&1)
 
-          # 构造推送消息
-          if [ $failure_count -eq 0 ]; then
-            title="贴吧签到成功（$account_count 个账号）"
+          # 获取命令执行状态码
+          status_code=$?
+
+          # 根据状态码构造推送消息
+          if [ $status_code -eq 0 ]; then
+            title="安和昂-✅贴吧签到成功"
+            desp="时间: $(date +"%Y-%m-%d %H:%M:%S")\n仓库: ${{ github.repository }}\n状态: 成功\n日志摘要:\n\`\`\`\n$(echo "$mvn_output" | tail -n 6)\`\`\`"
           else
-            title="贴吧签到异常（成功: $success_count, 失败: $failure_count）"
+            title="安和昂-❌贴吧签到失败"
+            desp="时间: $(date +"%Y-%m-%d %H:%M:%S")\n仓库: ${{ github.repository }}\n状态: 失败\n错误日志:\n\`\`\`\n$(echo "$mvn_output" | tail -n 10)\`\`\`"
           fi
-          
-          desp="**执行时间**：$(date +"%Y-%m-%d %H:%M:%S")\n" 
-          desp+="**仓库信息**：${{ github.repository }}\n\n"
-          desp+="**账号签到结果**：\n$summary"
 
-          # 发送汇总通知
+          # 调用 Server 酱 API 推送
           curl -X POST \
             -d "title=$title" \
             --data-urlencode "desp=$desp" \
